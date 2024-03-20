@@ -24,4 +24,11 @@ app.use(express.static("public"));
 // for cookie-parser
 app.use(cookieParser());
 
+// routes import
+import userRouter from "./routes/user.routes.js";
+
+// routes declaration-middleware
+app.use("/api/v1/users", userRouter);
+
+// example URL: http://localhost:8000/api/v1/users/register
 export { app };
