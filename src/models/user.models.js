@@ -53,7 +53,7 @@ userSchema.pre("save", async function (next) {
   // Only if password field is modified, run the encrypt otherwise nope.
   if (this.isModified("password")) {
     // bcrypt syntax to encrypt 'password' field
-    this.password = bcrypt.hash(this.password, 10);
+    this.password = await bcrypt.hash(this.password, 10);
     next();
   }
 });
