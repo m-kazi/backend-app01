@@ -19,7 +19,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 const registerUser = asyncHandler(async (req, res) => {
   // get user details from frontend
   const { fullName, email, userName, password } = req.body;
-  console.log("email: ", email);
+  // console.log("email: ", email);
 
   // validation - if any of the field is empty or not
   if (
@@ -29,41 +29,53 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   // check if user already exists: username, email
-  const existedUser = User.findOne({
+  const existedUser = await User.findOne({
     $or: [{ userName }, { email }],
   });
-  console.log(existedUser);
+  // console.log(existedUser);
 
   if (existedUser) {
     throw new ApiError(409, "User already exists.");
   }
+  console.log(req.files);
 
   // saving avatar & coverImages into localpath if it's there, based on multer middleware
-  const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
-  // checking if avatar is uploaded or not
+  // saving avatar into local path
+  const avatarLocalPath = req.files?.avatar[0]?.path;
+
+  // checking if coverImage is onlocal path or not
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
+
+  // checking if avatar is on local path otherwise throw error
   if (!avatarLocalPath) {
-    throw new ApiError(400, "Avatar file is required!");
+    throw new ApiError(400, "Avatar file is required");
   }
 
   // upload into cloudinary, await until the upload is done
   const avatar = await uploadOnCloudinary(avatarLocalPath);
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  // checking again if avatar is uploaded or not
+  // checking if avatar is uploaded or not
   if (!avatar) {
-    throw new ApiError(400, "Avatar file is required!");
+    throw new ApiError(400, "Avatar file is needed!");
   }
 
   // create user object - create entry in DB
   const user = await User.create({
     fullName,
-    avatar: avatar.url, //only url will be save into DB
-    coverImage: coverImage?.url || "",
     email,
     password,
     userName: userName.toLowerCase(),
+    avatar: avatar.url, //only url will be save into DB
+    coverImage: coverImage?.url || "",
   });
 
   // if the user  is found, remove password & refreshToken field
