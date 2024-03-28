@@ -15,7 +15,49 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 // remove password & refresh token field from response
 // check for user creation
 // return response
+/* ---------------------------------------------------- */
+// ** to Login user **
+// req body -> data
+// username or email check
+// find the user
+// password validation
+// access and refresh token
+// send tokens via cookies
 
+/* ---------------------------------------------------- */
+
+// ** to logout user **
+// clear cookies
+// reset refreshToken
+
+/* ---------------------------------------------------- */
+
+// generate access and refresh token method
+const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    // find the user to generate the token
+    const user = await User.findById(userId);
+
+    // generating the token
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    // adding the refreshToken for the user into DB
+    user.refreshToken = refreshToken;
+    // skipping the password validation to add the token
+    await user.save({ validateBeforeSave: false });
+
+    // return the objects
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Something went wrong while generating refresh & access token!"
+    );
+  }
+};
+
+// registering user
 const registerUser = asyncHandler(async (req, res) => {
   // get user details from frontend
   const { fullName, email, userName, password } = req.body;
@@ -94,4 +136,67 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User registerd successfully!"));
 });
 
-export { registerUser };
+// logging in a user
+const loginUser = asyncHandler(async (req, res) => {
+  // getting the data from req.body
+  const { userName, email, password } = req.body;
+
+  // username or email check
+  if (!userName || !email) {
+    throw new ApiError(400, "username or email is required!");
+  }
+
+  // find the user in DB, $or is MongoDB operator
+  const user = await User.findOne({
+    $or: [{ userName }, { email }],
+  });
+
+  // if user does not exist, throw an error
+  if (!user) {
+    throw new ApiError(404, "User does not exist!");
+  }
+
+  // password validation
+  const isPasswordValid = await user.isPasswordCorrect(password);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid user credentials!");
+  }
+
+  // access and refresh token method calling
+  // destructuring accessToken, refreshToken
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+    user._id
+  );
+
+  // send tokens via cookies
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  // cookies
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "User loggedIn successfully!"
+      )
+    );
+});
+
+// logging out a user
+const logoutUser = asyncHandler(async (req, res) => {});
+
+export { registerUser, loginUser };
